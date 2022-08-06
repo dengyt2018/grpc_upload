@@ -1,0 +1,87 @@
+syntax = "proto3";
+
+package upload;
+
+service Uploadfile {
+  rpc UploadFile(UploadFileRequest) returns (UploadFileResponse) {}
+}
+
+service Upload {
+  rpc Upload(UploadRequest) returns (UploadResponse) {}
+}
+
+message UploadRequest {
+  uint64 queue = 1;
+  Data data = 2;
+  UploadMode mode = 3;
+}
+
+message UploadResponse {
+  bool require_upload = 1;
+  uint64 queue = 2;
+  string file_hash = 3;
+  Chunk chunk = 4;
+  bool is_chunk = 5;
+}
+
+message UploadFileRequest {
+  uint64 queue = 1;
+  string file_hash = 2;
+  FileData file_data = 3;
+}
+
+message UploadFileResponse {
+  uint64 queue = 1;
+  bool upload_success = 2;
+  string file_hash = 3;
+  bool re_upload = 4;
+  Chunk chunk = 5;
+  bool is_chunk = 6;
+}
+
+message FileData {
+  bytes file = 1;
+  Data data = 2;
+}
+
+message Data {
+  uint64 queue = 10;
+  string file_hash = 1;
+  string file_path = 2;
+  string file_name = 3;
+  string original_path = 4;
+  bool is_file = 5;
+  uint64 file_size = 6;
+  Metadata metadata = 7;
+  bool is_chunk = 8;
+  Chunk chunk = 9;
+}
+
+message Chunk {
+  uint64 chunk_queue = 1;
+  uint32 chunk_total = 2;
+  string chunk_hash = 3;
+  uint64 offset = 4;
+  uint64 buffer = 5;
+}
+
+message Metadata {
+  uint64 creation_time = 1;
+  uint64 last_access_time = 2;
+  uint64 last_write_time = 3;
+}
+
+message UploadfileInfo {
+  message FileInfo {
+    repeated string file_path = 1;
+    uint32 count_files = 2;
+  }
+  map<string, FileInfo> uploadfile_info = 1;
+}
+
+enum UploadMode {
+  ADD_AND_REPLACE = 0;
+  UPDATE_AND_ADD = 1;
+  FRESHEN_EXISTING = 2;
+  SYNCHRONIZE = 3;
+}
