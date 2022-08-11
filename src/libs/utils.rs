@@ -326,44 +326,71 @@ pub mod chunk_method {
         Mb(usize),
     }
 
+    pub struct Chunk {
+        pub buffer: usize,
+        pub offset: u64,
+        count: [usize; 3], // [count, total, file_size]
+    }
+
     impl ChunkMethod {
-        pub fn capacity_method(&self, file_size: usize) -> Vec<(usize, u64)> {
+        pub fn capacity_method(&self, file_size: usize) -> Chunk {
             const ONE_KB: usize = 1024_usize;
-            const ONE_MB: usize = ONE_KB * 1024;
-            fn buffer(file_size: usize, capacity: usize) -> Vec<usize> {
-                let count = file_size / capacity;
-                let mut buffer = (0..count).map(|_| capacity).collect::<Vec<_>>();
-                buffer.push(file_size - (capacity * count));
-                buffer
-            }
-            fn offset(file_size: usize, capacity: usize) -> Vec<u64> {
-                (0..(file_size / capacity) + 1)
-                    .map(|n| (n * capacity) as u64)
-                    .collect::<Vec<u64>>()
-            }
-            fn method(file_size: usize, capacity: usize) -> Vec<(usize, u64)> {
-                let buffer = buffer(file_size, capacity);
-                let offset = offset(file_size, capacity);
-                buffer.into_iter().zip(offset).collect::<Vec<(_, _)>>()
+            const ONE_MB: usize = 1024_usize * 1024_usize;
+            fn c(file_size: &usize, capacity: &usize) -> Chunk {
+                Chunk {
+                    buffer: if file_size > capacity {
+                        *capacity
+                    } else {
+                        *file_size
+                    },
+                    offset: 0,
+                    count: [0, 1 + (file_size / capacity), *file_size],
+                }
             }
             match self {
-                ChunkMethod::Kb(k) => {
-                    let capacity = k * ONE_KB;
-                    if file_size <= capacity || *k == 0 {
-                        vec![(file_size, 0_u64)]
-                    } else {
-                        method(file_size, capacity)
-                    }
-                }
-                ChunkMethod::Mb(m) => {
-                    let capacity = m * ONE_MB;
-                    if file_size <= capacity || *m == 0 {
-                        vec![(file_size, 0_u64)]
-                    } else {
-                        method(file_size, capacity)
-                    }
-                }
+                ChunkMethod::Kb(k) => c(&file_size, &(if *k == 0 { ONE_KB } else { k * ONE_KB })),
+                ChunkMethod::Mb(m) => c(&file_size, &(if *m == 0 { ONE_MB } else { m * ONE_MB })),
             }
+        }
+    }
+
+    impl Chunk {
+        pub(crate) fn len(&self) -> u32 {
+            self.count[1] as u32
+        }
+    }
+
+    impl Iterator for Chunk {
+        type Item = Chunk;
+
+        fn next(&mut self) -> Option<Self::Item> {
+            if self.count[0] == self.count[1] {
+                None
+            } else {
+                let buffer = self.buffer;
+                let mut c = Chunk {
+                    buffer,
+                    offset: (self.buffer * self.count[0]) as u64,
+                    count: self.count,
+                };
+                if self.count[1] - 1 == self.count[0] {
+                    c.buffer = self.count[2] - c.offset as usize;
+                }
+                self.count[0] += 1;
+                Some(c)
+            }
+        }
+
+        fn last(self) -> Option<Self::Item>
+        where
+            Self: Sized,
+        {
+            let offset = self.buffer * (self.count[1] - 1);
+            Some(Chunk {
+                buffer: self.count[2] - offset,
+                offset: offset as u64,
+                count: self.count,
+            })
         }
     }
 }

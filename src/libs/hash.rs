@@ -23,19 +23,16 @@ pub mod checksum {
         if let Ok(mut file) = result {
             let mut hasher = Md5::new();
 
-            for (buf_size, offset) in chunk_method {
-                let mut buffer = vec![0_u8; buf_size];
-                file.seek(SeekFrom::Start(offset)).await;
+            for c in chunk_method {
+                let mut buffer = vec![0_u8; c.buffer];
+                file.seek(SeekFrom::Start(c.offset)).await;
                 file.read_exact(&mut buffer).await;
                 hasher.update(buffer);
             }
 
             let hash = hasher.finalize_fixed();
-            if let Ok(hex) = hash_to_hex(&hash) {
-                Ok(hex)
-            } else {
-                Err(())
-            }
+
+            hash_to_hex(&hash)
         } else {
             Err(())
         }
@@ -45,11 +42,7 @@ pub mod checksum {
         hasher.update(bytes);
         let hash = hasher.finalize_fixed();
 
-        if let Ok(hex) = hash_to_hex(&hash) {
-            Ok(hex)
-        } else {
-            Err(())
-        }
+        hash_to_hex(&hash)
     }
 
     fn hash_to_hex(hash: &Output<CoreWrapper<Md5Core>>) -> Result<String, ()> {

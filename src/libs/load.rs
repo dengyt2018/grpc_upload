@@ -143,7 +143,7 @@ pub async fn client_upload_file_request(
     upload_queue: &mut UploadQueue,
 ) {
     let chunk_method = ChunkMethod::Mb(10).capacity_method(data.file_size as usize);
-    let chunk_total = chunk_method.len() as u32;
+    let chunk_total = chunk_method.len();
     let (tx, mut rx) = channel(5);
     let file_hash = data.file_hash.to_owned();
     let file_path = data.file_path.to_owned();
@@ -152,8 +152,8 @@ pub async fn client_upload_file_request(
         let mut result = tokio::fs::File::open(&data.original_path).await;
 
         if let Ok(mut file) = result {
-            for (buffer, offset) in chunk_method {
-                let file = load_file(&mut file, &buffer, &offset).await;
+            for c in chunk_method {
+                let file = load_file(&mut file, &c.buffer, &c.offset).await;
 
                 let mut chunk_hash = "".to_string();
                 if let Ok(h) = md5_bytes(&file) {
@@ -166,8 +166,8 @@ pub async fn client_upload_file_request(
                     chunk_queue: 0,
                     chunk_total,
                     chunk_hash,
-                    offset,
-                    buffer: buffer.to_owned() as u64,
+                    offset: c.offset,
+                    buffer: c.buffer as u64,
                 });
 
                 let file_data = FileData {
