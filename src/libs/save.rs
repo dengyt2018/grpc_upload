@@ -1,6 +1,5 @@
 #![allow(unused, dead_code, unused_variables)]
 
-use crate::libs::hash::checksum::md5_bytes;
 use crate::libs::upload::uploadfile_info::FileInfo;
 use crate::libs::upload::{
     Chunk, Data, FileData, UploadFileRequest, UploadFileResponse, UploadMode, UploadRequest,

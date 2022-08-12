@@ -2,8 +2,9 @@
 
 #[cfg(test)]
 mod test {
-    use crate::libs::hash::checksum::md5_file;
+    use crate::crypto_file;
     use crate::libs::load::strip_prefix;
+    use md5::Digest;
     use rand::{Rng, RngCore};
     use std::io::Write;
     use std::path::Path;
@@ -55,8 +56,12 @@ mod test {
             let file_to_path = Path::new(strip_prefix(path_from, file_from_path).to_str().unwrap());
 
             if file_from_path.is_file() {
-                let val1 = md5_file(file_from_path.to_str().unwrap()).await.unwrap();
-                let val2 = md5_file(file_to_path.to_str().unwrap()).await.unwrap();
+                let val1 = crypto_file!(Path::new(file_from_path), md5::Md5::new())
+                    .await
+                    .unwrap();
+                let val2 = crypto_file!(Path::new(file_to_path), md5::Md5::new())
+                    .await
+                    .unwrap();
                 assert_eq!(val1, val2);
             }
         }

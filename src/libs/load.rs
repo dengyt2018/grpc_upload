@@ -1,7 +1,5 @@
 #![allow(unused, dead_code, unused_variables)]
 
-use crate::libs;
-use crate::libs::hash::checksum::{md5_bytes, md5_file};
 use crate::libs::upload;
 use crate::libs::upload::uploadfile_client::UploadfileClient;
 use crate::libs::upload::{
@@ -9,7 +7,9 @@ use crate::libs::upload::{
 };
 use crate::libs::utils::chunk_method::ChunkMethod;
 use crate::libs::utils::upload_queue::{QueueMethod, UploadQueue};
+use crate::{crypto_bytes, crypto_file, libs};
 use log::log;
+use md5::Digest;
 use std::borrow::{Borrow, BorrowMut};
 use std::collections::HashMap;
 use std::io::Seek;
@@ -121,7 +121,7 @@ pub async fn upload_request(data: &mut Data) -> UploadRequest {
     let queue = UploadQueue::generate_queue();
     data.queue = queue.to_owned();
     data.file_hash = if data.is_file {
-        if let Ok(hash) = md5_file(&data.original_path).await {
+        if let Ok(hash) = crypto_file!(Path::new(&data.original_path), md5::Md5::new()).await {
             hash
         } else {
             "".to_string()
@@ -142,7 +142,7 @@ pub async fn client_upload_file_request(
     upload_file_client: &mut UploadfileClient<Channel>,
     upload_queue: &mut UploadQueue,
 ) {
-    let chunk_method = ChunkMethod::Mb(10).capacity_method(data.file_size as usize);
+    let chunk_method = ChunkMethod::Mb(10).capacity_method(Path::new(&data.original_path));
     let chunk_total = chunk_method.len();
     let (tx, mut rx) = channel(5);
     let file_hash = data.file_hash.to_owned();
@@ -156,7 +156,7 @@ pub async fn client_upload_file_request(
                 let file = load_file(&mut file, &c.buffer, &c.offset).await;
 
                 let mut chunk_hash = "".to_string();
-                if let Ok(h) = md5_bytes(&file) {
+                if let Ok(h) = crypto_bytes!(&file, md5::Md5::new()) {
                     chunk_hash = h;
                 }
 

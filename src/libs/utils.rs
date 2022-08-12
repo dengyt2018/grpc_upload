@@ -321,6 +321,8 @@ pub mod server_to_do_action {
 }
 
 pub mod chunk_method {
+    use std::path::Path;
+
     pub enum ChunkMethod {
         Kb(usize),
         Mb(usize),
@@ -333,7 +335,7 @@ pub mod chunk_method {
     }
 
     impl ChunkMethod {
-        pub fn capacity_method(&self, file_size: usize) -> Chunk {
+        pub fn capacity_method(&self, path: &Path) -> Chunk {
             const ONE_KB: usize = 1024_usize;
             const ONE_MB: usize = 1024_usize * 1024_usize;
             fn c(file_size: &usize, capacity: &usize) -> Chunk {
@@ -347,15 +349,30 @@ pub mod chunk_method {
                     count: [0, 1 + (file_size / capacity), *file_size],
                 }
             }
+
+            fn file_size(path: &Path) -> usize {
+                let file_metadata = path.metadata();
+                let mut file_size = 0_usize;
+                if let Ok(metadata) = file_metadata {
+                    file_size = metadata.len() as usize;
+                };
+                file_size
+            }
             match self {
-                ChunkMethod::Kb(k) => c(&file_size, &(if *k == 0 { ONE_KB } else { k * ONE_KB })),
-                ChunkMethod::Mb(m) => c(&file_size, &(if *m == 0 { ONE_MB } else { m * ONE_MB })),
+                ChunkMethod::Kb(k) => c(
+                    &file_size(path),
+                    &(if *k == 0 { ONE_KB } else { k * ONE_KB }),
+                ),
+                ChunkMethod::Mb(m) => c(
+                    &file_size(path),
+                    &(if *m == 0 { ONE_MB } else { m * ONE_MB }),
+                ),
             }
         }
     }
 
     impl Chunk {
-        pub(crate) fn len(&self) -> u32 {
+        pub fn len(&self) -> u32 {
             self.count[1] as u32
         }
     }
@@ -396,9 +413,10 @@ pub mod chunk_method {
 }
 
 pub mod file_handle {
-    use crate::libs::hash::checksum::md5_file;
+    use crate::crypto_file;
     use crate::libs::upload::UploadfileInfo;
     use crate::libs::utils::uploadfile_info::UploadfileInfoTrait;
+    use md5::Digest;
     use std::collections::HashMap;
     use std::ops::{Deref, DerefMut};
     use std::path::Path;
@@ -496,7 +514,11 @@ pub mod file_handle {
                     self.remove(queue);
                     let mut upload_file_info = self.upload_file_info.lock().await;
 
-                    if file_hash.eq_ignore_ascii_case(&*md5_file(file_path).await.unwrap()) {
+                    if file_hash.eq_ignore_ascii_case(
+                        &*crypto_file!(Path::new(file_path), md5::Md5::new())
+                            .await
+                            .unwrap(),
+                    ) {
                         log::info!("queue: {}, path: {} . write done.", queue, file_path);
                         upload_file_info.add(file_path, file_hash);
                     } else {
